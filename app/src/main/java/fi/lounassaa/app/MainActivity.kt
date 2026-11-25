@@ -30,6 +30,7 @@ class MainActivity : Activity() {
     private lateinit var logView: TextView
     private lateinit var errorView: TextView
     private var tagSignature = ""
+    private lateinit var ui: Ui
 
     private val tick = object : Runnable {
         override fun run() {
@@ -43,13 +44,20 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(ScaledRoot(this, true) { u -> build(u) })
+    }
+
+    private fun build(u: Ui): android.view.View {
+        ui = u
+        tagSignature = ""
+        val p = u.px(24f)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
+            setPadding(p, p, p, p)
         }
         col.addView(title("Lounassää – laitetestiversio"))
 
-        statusView = TextView(this).apply { textSize = 18f }
+        statusView = TextView(this).apply { u.text(this, 18f) }
         col.addView(statusView)
 
         col.addView(row(
@@ -72,11 +80,14 @@ class MainActivity : Activity() {
         col.addView(row(
             button("Avaa näytönsäästäjäasetukset") { openDreamSettings() },
             button("Käynnistä näytönsäästäjä nyt") { startDreamNow() },
+            button("Päivänäkymän esikatselu") {
+                startActivity(Intent(this, PreviewActivity::class.java))
+            },
         ))
 
         col.addView(title("Virheet"))
         errorView = TextView(this).apply {
-            textSize = 14f
+            u.text(this, 14f)
             typeface = Typeface.MONOSPACE
             setTextColor(android.graphics.Color.rgb(200, 40, 40))
         }
@@ -85,12 +96,13 @@ class MainActivity : Activity() {
 
         col.addView(title("Tapahtumaloki (uusin ensin)"))
         logView = TextView(this).apply {
-            textSize = 14f
+            u.text(this, 14f)
             typeface = Typeface.MONOSPACE
         }
         col.addView(logView)
 
-        setContentView(ScrollView(this).apply { addView(col) })
+        refresh()
+        return ScrollView(this).apply { addView(col) }
     }
 
     override fun onResume() {
@@ -105,14 +117,16 @@ class MainActivity : Activity() {
 
     private fun title(t: String) = TextView(this).apply {
         text = t
-        textSize = 22f
+        ui.text(this, 22f)
         setTypeface(null, Typeface.BOLD)
-        setPadding(0, 32, 0, 12)
+        setPadding(0, ui.px(24f), 0, ui.px(8f))
     }
 
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
         text = label
         isAllCaps = false
+        ui.text(this, 16f)
+        minHeight = ui.px(52f)
         setOnClickListener { onClick() }
     }
 
@@ -226,9 +240,11 @@ class MainActivity : Activity() {
     private fun toast(t: String) = Toast.makeText(this, t, Toast.LENGTH_SHORT).show()
 
     private fun refresh() {
+        if (!::statusView.isInitialized) return
         val db = Db.get(this)
         val now = System.currentTimeMillis()
         statusView.text = buildString {
+            append("Näyttö: ${ui.describe()}\n")
             append("Luvat: ${if (ScanService.hasPermissions(this@MainActivity)) "OK" else "puuttuu"}\n")
             append("Seuranta: ${if (ScanService.running) "käynnissä" else "pysäytetty"}\n")
             append("Näytön sammutus: ${if (dpm.isAdminActive(admin)) "käytössä" else "ei käytössä"}\n")
@@ -246,7 +262,7 @@ class MainActivity : Activity() {
                 tagsBox.addView(TextView(this).apply { text = "Ei vielä antureita. Käynnistä seuranta." })
             }
             for (mac in macs) {
-                val label = TextView(this).apply { textSize = 18f; tag = mac }
+                val label = TextView(this).apply { ui.text(this, 17f); tag = mac }
                 val outBtn = button("Ulko") { Prefs.setOutdoor(this@MainActivity, mac); tagSignature = "" }
                 val inBtn = button("Sisä") { Prefs.setIndoor(this@MainActivity, mac); tagSignature = "" }
                 val line = LinearLayout(this).apply {
