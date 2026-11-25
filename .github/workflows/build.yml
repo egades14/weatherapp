@@ -47,5 +47,5 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk lounassaa.apk
           gh release create "build-${{ github.run_number }}" lounassaa.apk \
-            --prerelease --title "Build ${{ github.run_number }}" \
+            --latest --title "Build ${{ github.run_number }}" \
             --notes "Automaattinen build commitista ${{ github.sha }}"
