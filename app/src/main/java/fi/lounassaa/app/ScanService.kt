@@ -54,6 +54,7 @@ class ScanService : Service() {
     private lateinit var db: Db
     private var scanner: BluetoothLeScanner? = null
     private var resultsSinceTick = 0
+    private var rejected = 0L
     private val lastStoredMinute = HashMap<String, Long>()
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -77,7 +78,7 @@ class ScanService : Service() {
         }
 
         override fun onScanFailed(errorCode: Int) {
-            db.logEvent("scan_failed", errorCode.toString())
+            db.logError("scan_failed", errorCode.toString())
         }
     }
 
@@ -113,7 +114,7 @@ class ScanService : Service() {
             .build()
 
         if (!hasPermissions(this)) {
-            db.logEvent("service_no_permission")
+            db.logError("service_no_permission")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -142,7 +143,7 @@ class ScanService : Service() {
     private fun startScan() {
         val adapter = getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null || !adapter.isEnabled) {
-            db.logEvent("bluetooth_off")
+            db.logError("bluetooth_off")
             return
         }
         scanner = adapter.bluetoothLeScanner
@@ -153,7 +154,7 @@ class ScanService : Service() {
         try {
             scanner?.startScan(listOf(filter), settings, callback)
         } catch (e: Exception) {
-            db.logEvent("scan_start_error", e.javaClass.simpleName)
+            db.logError("scan_start_error", e.javaClass.simpleName)
         }
     }
 
@@ -170,11 +171,31 @@ class ScanService : Service() {
         startScan()
     }
 
+    private val lastRejectLog = HashMap<String, Long>()
+
     private fun handle(result: ScanResult) {
+        try {
+            handleUnsafe(result)
+        } catch (e: Exception) {
+            db.logError("käsittely", e.javaClass.simpleName + ": " + e.message)
+        }
+    }
+
+    private fun handleUnsafe(result: ScanResult) {
         val bytes = result.scanRecord?.getManufacturerSpecificData(RuuviParser.MANUFACTURER_ID) ?: return
         val r = RuuviParser.parseV5(bytes) ?: return
         val mac = result.device.address
         val now = System.currentTimeMillis()
+        val reason = Plausible.check(r)
+        if (reason != null) {
+            rejected++
+            val last = lastRejectLog[mac] ?: 0L
+            if (now - last > 10 * 60 * 1000L) {
+                lastRejectLog[mac] = now
+                db.logError("hylätty_arvo", "$mac $reason (hylättyjä yht. $rejected)")
+            }
+            return
+        }
         Live.latest[mac] = Seen(now, r, result.rssi)
         resultsSinceTick++
         val minute = now / 60000

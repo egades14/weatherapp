@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var tagsBox: LinearLayout
     private lateinit var logView: TextView
+    private lateinit var errorView: TextView
     private var tagSignature = ""
 
     private val tick = object : Runnable {
@@ -72,6 +73,15 @@ class MainActivity : Activity() {
             button("Avaa näytönsäästäjäasetukset") { openDreamSettings() },
             button("Käynnistä näytönsäästäjä nyt") { startDreamNow() },
         ))
+
+        col.addView(title("Virheet"))
+        errorView = TextView(this).apply {
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            setTextColor(android.graphics.Color.rgb(200, 40, 40))
+        }
+        col.addView(errorView)
+        col.addView(row(button("Jaa loki") { shareLog() }))
 
         col.addView(title("Tapahtumaloki (uusin ensin)"))
         logView = TextView(this).apply {
@@ -203,6 +213,16 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun shareLog() {
+        val text = Db.get(this).recentEvents(300).joinToString("\n")
+        startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+                "Jaa loki"
+            )
+        )
+    }
+
     private fun toast(t: String) = Toast.makeText(this, t, Toast.LENGTH_SHORT).show()
 
     private fun refresh() {
@@ -212,7 +232,8 @@ class MainActivity : Activity() {
             append("Luvat: ${if (ScanService.hasPermissions(this@MainActivity)) "OK" else "puuttuu"}\n")
             append("Seuranta: ${if (ScanService.running) "käynnissä" else "pysäytetty"}\n")
             append("Näytön sammutus: ${if (dpm.isAdminActive(admin)) "käytössä" else "ei käytössä"}\n")
-            append("Tallennettuja mittauksia: ${db.count()}")
+            append("Tallennettuja mittauksia: ${db.count()}\n")
+            append("Virheitä 24 h: ${db.errorCountSince(now - 24 * 3600 * 1000L)}")
         }
 
         val stored = db.latestPerTag().associateBy { it.mac }
@@ -257,6 +278,8 @@ class MainActivity : Activity() {
             }
         }
 
+        val errors = db.recentErrors(15)
+        errorView.text = if (errors.isEmpty()) "Ei virheitä" else errors.joinToString("\n")
         logView.text = db.recentEvents(40).joinToString("\n")
     }
 }

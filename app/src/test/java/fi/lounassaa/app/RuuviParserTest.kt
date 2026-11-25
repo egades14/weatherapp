@@ -39,3 +39,22 @@ class RuuviParserTest {
         assertNull(RuuviParser.parseV5(ByteArray(5)))
     }
 }
+
+class PlausibleTest {
+    private fun r(t: Double = 20.0, h: Double = 50.0, p: Double = 1000.0, v: Double = 3.0) =
+        RuuviReading(t, h, p, v, 4, 0, 1)
+
+    @org.junit.Test
+    fun acceptsNormalValues() {
+        org.junit.Assert.assertNull(Plausible.check(r()))
+        org.junit.Assert.assertNull(Plausible.check(r(t = -45.0)))
+    }
+
+    @org.junit.Test
+    fun rejectsImpossibleValues() {
+        org.junit.Assert.assertNotNull(Plausible.check(r(t = 163.0)))
+        org.junit.Assert.assertNotNull(Plausible.check(r(h = 120.0)))
+        org.junit.Assert.assertNotNull(Plausible.check(r(p = 500.0)))
+        org.junit.Assert.assertNotNull(Plausible.check(r(v = 1.0)))
+    }
+}

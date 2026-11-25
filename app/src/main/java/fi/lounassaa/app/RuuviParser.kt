@@ -36,3 +36,14 @@ object RuuviParser {
         )
     }
 }
+
+/** Rejects values that cannot be real, so garbage never reaches the database. */
+object Plausible {
+    fun check(r: RuuviReading): String? = when {
+        r.tempC < -60.0 || r.tempC > 60.0 -> "lämpötila ${r.tempC}"
+        r.humidity < 0.0 || r.humidity > 100.0 -> "kosteus ${r.humidity}"
+        r.pressureHpa < 850.0 || r.pressureHpa > 1090.0 -> "ilmanpaine ${r.pressureHpa}"
+        r.voltage < 1.6 || r.voltage > 3.7 -> "jännite ${r.voltage}"
+        else -> null
+    }
+}

@@ -65,6 +65,17 @@ class Db private constructor(ctx: Context) :
         writableDatabase.insert("events", null, v)
     }
 
+    /** Errors are events whose kind starts with VIRHE_. */
+    fun logError(kind: String, info: String = "") = logEvent("VIRHE_$kind", info)
+
+    @Synchronized
+    fun errorCountSince(sinceTs: Long): Long = DatabaseUtils.queryNumEntries(
+        readableDatabase, "events", "kind LIKE 'VIRHE\\_%' ESCAPE '\\' AND ts >= ?", arrayOf(sinceTs.toString())
+    )
+
+    @Synchronized
+    fun recentErrors(n: Int): List<String> = queryEvents("WHERE kind LIKE 'VIRHE\\_%' ESCAPE '\\'", n)
+
     @Synchronized
     fun count(): Long = DatabaseUtils.queryNumEntries(readableDatabase, "readings")
 
@@ -89,11 +100,13 @@ class Db private constructor(ctx: Context) :
     }
 
     @Synchronized
-    fun recentEvents(n: Int): List<String> {
+    fun recentEvents(n: Int): List<String> = queryEvents("", n)
+
+    private fun queryEvents(where: String, n: Int): List<String> {
         val fmt = SimpleDateFormat("d.M. HH:mm:ss", Locale("fi", "FI"))
         val out = ArrayList<String>()
         readableDatabase.rawQuery(
-            "SELECT ts, kind, info FROM events ORDER BY ts DESC, rowid DESC LIMIT ?",
+            "SELECT ts, kind, info FROM events $where ORDER BY ts DESC, rowid DESC LIMIT ?",
             arrayOf(n.toString())
         ).use { c ->
             while (c.moveToNext()) {

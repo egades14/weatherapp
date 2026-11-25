@@ -14,7 +14,7 @@ class BootReceiver : BroadcastReceiver() {
             try {
                 ScanService.start(context)
             } catch (e: Exception) {
-                db.logEvent("autostart_failed", e.javaClass.simpleName)
+                db.logError("autostart_failed", e.javaClass.simpleName)
             }
         }
     }
