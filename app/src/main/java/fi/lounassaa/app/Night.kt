@@ -20,7 +20,8 @@ import java.util.Locale
 object Shown {
     @Volatile var dream = false
     @Volatile var day: WeakReference<Activity>? = null
-    @Volatile var night = false
+    @Volatile var nightView: WeakReference<Activity>? = null
+    val night: Boolean get() = nightView?.get() != null
     fun displayMode(): Boolean = dream || day?.get() != null || night
 }
 
@@ -29,6 +30,9 @@ object Night {
     const val ACTION_START = "fi.lounassaa.app.NIGHT_START"
     const val ACTION_END = "fi.lounassaa.app.NIGHT_END"
     private const val RECHECK_MS = 5 * 60 * 1000L
+
+    /** Screen-on events caused by the app's own morning wake are not double taps. */
+    @Volatile var ignoreScreenOnUntil = 0L
 
     fun isNightMinute(minute: Int, start: Int, end: Int): Boolean =
         if (start == end) false
@@ -130,6 +134,7 @@ object Night {
     }
 
     fun onScreenOn(c: Context) {
+        if (System.currentTimeMillis() < ignoreScreenOnUntil) return
         if (!isNight(c) || Shown.night) return
         Db.get(c).logEvent("yö_näyttö_päälle")
         launch(c, NightActivity::class.java, wake = false)
@@ -164,6 +169,9 @@ class NightReceiver : BroadcastReceiver() {
                 }
                 Night.ACTION_END -> {
                     db.logEvent("aamuherätys")
+                    Night.ignoreScreenOnUntil = System.currentTimeMillis() + 60_000L
+                    if (System.currentTimeMillis() >= Prefs.testNightStart(c) - 1000L) Prefs.setTestNight(c, 0L, 0L)
+                    Shown.nightView?.get()?.finish()
                     wakeScreen(c)
                     Night.launch(c, DayActivity::class.java, wake = true)
                 }
