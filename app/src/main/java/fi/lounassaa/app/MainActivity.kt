@@ -31,6 +31,8 @@ class MainActivity : Activity() {
     private lateinit var errorView: TextView
     private var tagSignature = ""
     private lateinit var ui: Ui
+    private lateinit var nightStartBtn: Button
+    private lateinit var nightEndBtn: Button
 
     private val tick = object : Runnable {
         override fun run() {
@@ -45,6 +47,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(ScaledRoot(this, true) { u -> build(u) })
+        Night.scheduleAll(this)
     }
 
     private fun build(u: Ui): android.view.View {
@@ -71,9 +74,19 @@ class MainActivity : Activity() {
         tagsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(tagsBox)
 
-        col.addView(title("Yösammutuksen testi"))
+        col.addView(title("Yöjakso"))
         col.addView(row(
             button("Ota näytön sammutus käyttöön") { enableAdmin() },
+            button("Salli näyttö lukitusnäytön päällä") { overlayPermission() },
+        ))
+        nightStartBtn = button("") { pickTime(true) }
+        nightEndBtn = button("") { pickTime(false) }
+        col.addView(row(
+            nightStartBtn,
+            nightEndBtn,
+            button("Testaa yöjakso (alkaa 1 min, kestää 5 min)") { Night.startTest(this) },
+        ))
+        col.addView(row(
             button("Sammuta näyttö nyt") { lockNow() },
             button("Sammuta, herätä 2 min päästä") { lockAndWake() },
         ))
@@ -81,7 +94,7 @@ class MainActivity : Activity() {
             button("Avaa näytönsäästäjäasetukset") { openDreamSettings() },
             button("Käynnistä näytönsäästäjä nyt") { startDreamNow() },
             button("Päivänäkymän esikatselu") {
-                startActivity(Intent(this, PreviewActivity::class.java))
+                startActivity(Intent(this, DayActivity::class.java))
             },
         ))
 
@@ -227,6 +240,21 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun overlayPermission() {
+        startActivity(
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+        )
+    }
+
+    private fun pickTime(start: Boolean) {
+        val cur = if (start) Prefs.nightStart(this) else Prefs.nightEnd(this)
+        android.app.TimePickerDialog(this, { _, h, m ->
+            if (start) Prefs.setNightStart(this, h * 60 + m) else Prefs.setNightEnd(this, h * 60 + m)
+            Db.get(this).logEvent("yöjakso_muutettu", "${Night.hhmm(Prefs.nightStart(this))}–${Night.hhmm(Prefs.nightEnd(this))}")
+            Night.scheduleAll(this)
+        }, cur / 60, cur % 60, true).show()
+    }
+
     private fun shareLog() {
         val text = Db.get(this).recentEvents(300).joinToString("\n")
         startActivity(
@@ -241,10 +269,15 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         if (!::statusView.isInitialized) return
+        nightStartBtn.text = "Yö alkaa ${Night.hhmm(Prefs.nightStart(this))}"
+        nightEndBtn.text = "Herätys ${Night.hhmm(Prefs.nightEnd(this))}"
         val db = Db.get(this)
         val now = System.currentTimeMillis()
         statusView.text = buildString {
             append("Näyttö: ${ui.describe()}\n")
+            append("Yöjakso: ${Night.hhmm(Prefs.nightStart(this@MainActivity))}–${Night.hhmm(Prefs.nightEnd(this@MainActivity))}" +
+                " (nyt ${if (Night.isNight(this@MainActivity)) "yö" else "päivä"})\n")
+            append("Lukitusnäytön päällä näyttäminen: ${if (Night.canShowOverLock(this@MainActivity)) "sallittu" else "ei sallittu"}\n")
             append("Luvat: ${if (ScanService.hasPermissions(this@MainActivity)) "OK" else "puuttuu"}\n")
             append("Seuranta: ${if (ScanService.running) "käynnissä" else "pysäytetty"}\n")
             append("Näytön sammutus: ${if (dpm.isAdminActive(admin)) "käytössä" else "ei käytössä"}\n")

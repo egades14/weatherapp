@@ -60,7 +60,14 @@ class ScanService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_SCREEN_ON -> db.logEvent("screen_on")
+                Intent.ACTION_SCREEN_ON -> {
+                    db.logEvent("screen_on")
+                    try {
+                        Night.onScreenOn(context)
+                    } catch (e: Exception) {
+                        db.logError("yönäkymä", e.javaClass.simpleName + ": " + e.message)
+                    }
+                }
                 Intent.ACTION_SCREEN_OFF -> db.logEvent("screen_off")
                 Intent.ACTION_POWER_CONNECTED -> db.logEvent("power_connected")
                 Intent.ACTION_POWER_DISCONNECTED -> db.logEvent("power_disconnected")

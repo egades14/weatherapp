@@ -27,12 +27,15 @@ class TestDream : DreamService() {
 
     override fun onDreamingStarted() {
         super.onDreamingStarted()
+        Shown.dream = true
         Db.get(this).logEvent("dream_start")
         handler.post(tick)
+        Night.onDreamStarted(this)
     }
 
     override fun onDreamingStopped() {
         handler.removeCallbacksAndMessages(null)
+        Shown.dream = false
         Db.get(this).logEvent("dream_stop")
         super.onDreamingStopped()
     }

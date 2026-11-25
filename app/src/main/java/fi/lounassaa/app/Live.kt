@@ -17,6 +17,14 @@ object Prefs {
     fun indoor(c: Context): String? = sp(c).getString("indoor", null)
     fun setOutdoor(c: Context, mac: String?) = sp(c).edit().putString("outdoor", mac).apply()
     fun setIndoor(c: Context, mac: String?) = sp(c).edit().putString("indoor", mac).apply()
+    fun nightStart(c: Context): Int = sp(c).getInt("nightStart", 23 * 60)
+    fun nightEnd(c: Context): Int = sp(c).getInt("nightEnd", 6 * 60 + 30)
+    fun setNightStart(c: Context, m: Int) = sp(c).edit().putInt("nightStart", m).apply()
+    fun setNightEnd(c: Context, m: Int) = sp(c).edit().putInt("nightEnd", m).apply()
+    fun testNightStart(c: Context): Long = sp(c).getLong("testNightStart", 0L)
+    fun testNightEnd(c: Context): Long = sp(c).getLong("testNightEnd", 0L)
+    fun setTestNight(c: Context, start: Long, end: Long) =
+        sp(c).edit().putLong("testNightStart", start).putLong("testNightEnd", end).apply()
     fun autostart(c: Context): Boolean = sp(c).getBoolean("autostart", false)
     fun setAutostart(c: Context, v: Boolean) = sp(c).edit().putBoolean("autostart", v).apply()
 }
