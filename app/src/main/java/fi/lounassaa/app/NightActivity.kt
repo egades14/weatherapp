@@ -8,7 +8,7 @@ import java.lang.ref.WeakReference
 
 /**
  * Shown on top of the lock screen when the screen is turned on at night (double tap):
- * the day view at low brightness, screen off again after 30 s without touches.
+ * the day view at system brightness (adaptive brightness dims it in a dark room), screen off again after 30 s without touches.
  */
 class NightActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
@@ -28,7 +28,6 @@ class NightActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOverLock()
-        window.attributes = window.attributes.apply { screenBrightness = 0.1f }
         setContentView(ScaledRoot(this, false) { ui ->
             DayScreen(this, ui) { finish() }.also { screen = it }.root
         })

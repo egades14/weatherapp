@@ -55,6 +55,9 @@ class ScanService : Service() {
     private var scanner: BluetoothLeScanner? = null
     private var resultsSinceTick = 0
     private var rejected = 0L
+
+    /** Screen off: scan about 10 % of the time instead of 25 %. A tag sends roughly once a second, so a minute still gets readings. */
+    private var lowPower = false
     private val lastStoredMinute = HashMap<String, Long>()
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -62,13 +65,19 @@ class ScanService : Service() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_ON -> {
                     db.logEvent("screen_on")
+                    lowPower = false
+                    restartScan()
                     try {
                         Night.onScreenOn(context)
                     } catch (e: Exception) {
                         db.logError("yönäkymä", e.javaClass.simpleName + ": " + e.message)
                     }
                 }
-                Intent.ACTION_SCREEN_OFF -> db.logEvent("screen_off")
+                Intent.ACTION_SCREEN_OFF -> {
+                    db.logEvent("screen_off")
+                    lowPower = true
+                    restartScan()
+                }
                 Intent.ACTION_POWER_CONNECTED -> db.logEvent("power_connected")
                 Intent.ACTION_POWER_DISCONNECTED -> db.logEvent("power_disconnected")
             }
@@ -91,7 +100,7 @@ class ScanService : Service() {
 
     private val tick = object : Runnable {
         override fun run() {
-            db.logEvent("tick", "adverts=$resultsSinceTick tags=${Live.latest.size}")
+            db.logEvent("tick", "adverts=$resultsSinceTick tags=${Live.latest.size} tila=${if (lowPower) "säästö" else "normaali"}")
             resultsSinceTick = 0
             restartScan()
             handler.postDelayed(this, TICK_MS)
@@ -157,7 +166,9 @@ class ScanService : Service() {
         val filter = ScanFilter.Builder()
             .setManufacturerData(RuuviParser.MANUFACTURER_ID, byteArrayOf(5), byteArrayOf(0xFF.toByte()))
             .build()
-        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
+        val settings = ScanSettings.Builder()
+            .setScanMode(if (lowPower) ScanSettings.SCAN_MODE_LOW_POWER else ScanSettings.SCAN_MODE_BALANCED)
+            .build()
         try {
             scanner?.startScan(listOf(filter), settings, callback)
         } catch (e: Exception) {
