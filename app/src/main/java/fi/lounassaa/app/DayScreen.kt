@@ -272,8 +272,8 @@ class DayScreen(private val ctx: Context, private val ui: Ui, private val onExit
         chart.data = ChartData(start, end, now, measured, fc, yest)
 
         val hour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
-        val (nFrom, nTo) = if (hour < 8) at(now, -1, 22) to now else at(now, -1, 22) to at(now, 0, 8)
-        lastNightLabel?.text = if (hour < 8) "Tämä yö alin" else "Viime yö alin"
+        val (nFrom, nTo) = if (hour < 9) at(now, -1, 18) to now else at(now, -1, 18) to at(now, 0, 9)
+        lastNightLabel?.text = if (hour < 9) "Tämä yö alin" else "Viime yö alin"
         val low = mac?.let { db.temps(it, nFrom, nTo) }?.minByOrNull { it.second }
         if (low != null) {
             lastNightValue.text = deg(low.second)

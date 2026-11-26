@@ -105,7 +105,7 @@ object Weather {
         return if (next.ts <= now) "$k tällä tunnilla" else "$k noin klo ${SimpleDateFormat("HH", fi).format(Date(next.ts))} alkaen"
     }
 
-    /** Lowest forecast temperature for the coming night (22–08, or the rest of the current night). */
+    /** Lowest forecast temperature for the coming night (18–09, or the rest of the current night). */
     fun nightMin(fc: List<FcPoint>, now: Long): FcPoint? {
         val cal = Calendar.getInstance().apply { timeInMillis = now }
         val hour = cal.get(Calendar.HOUR_OF_DAY)
@@ -115,9 +115,9 @@ object Weather {
             set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
         val (from, to) = when {
-            hour < 8 -> now to at(0, 8)
-            hour >= 22 -> now to at(1, 8)
-            else -> at(0, 22) to at(1, 8)
+            hour < 9 -> now to at(0, 9)
+            hour >= 18 -> now to at(1, 9)
+            else -> at(0, 18) to at(1, 9)
         }
         return fc.filter { it.ts in from..to }.minByOrNull { it.temp }
     }
