@@ -93,6 +93,10 @@ class MainActivity : Activity() {
         col.addView(row(
             button("Avaa näytönsäästäjäasetukset") { openDreamSettings() },
             button("Käynnistä näytönsäästäjä nyt") { startDreamNow() },
+            button("Hae ennuste nyt") {
+                Weather.maybeFetchForecast(this, force = true)
+                Weather.maybeFetchNowcast(this)
+            },
             button("Päivänäkymän esikatselu") {
                 startActivity(Intent(this, DayActivity::class.java))
             },
@@ -275,6 +279,7 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         statusView.text = buildString {
             append("Näyttö: ${ui.describe()}\n")
+            append(Weather.status(this@MainActivity) + "\n")
             append("Yöjakso: ${Night.hhmm(Prefs.nightStart(this@MainActivity))}–${Night.hhmm(Prefs.nightEnd(this@MainActivity))}" +
                 " (nyt ${if (Night.isNight(this@MainActivity)) "yö" else "päivä"})\n")
             append("Lukitusnäytön päällä näyttäminen: ${if (Night.canShowOverLock(this@MainActivity)) "sallittu" else "ei sallittu"}\n")

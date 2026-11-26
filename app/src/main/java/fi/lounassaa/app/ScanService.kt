@@ -98,6 +98,14 @@ class ScanService : Service() {
         }
     }
 
+    private val weatherTick = object : Runnable {
+        override fun run() {
+            Weather.maybeFetchForecast(this@ScanService)
+            if (!lowPower) Weather.maybeFetchNowcast(this@ScanService)
+            handler.postDelayed(this, 60_000L)
+        }
+    }
+
     private val tick = object : Runnable {
         override fun run() {
             db.logEvent("tick", "adverts=$resultsSinceTick tags=${Live.latest.size} tila=${if (lowPower) "säästö" else "normaali"}")
@@ -152,6 +160,7 @@ class ScanService : Service() {
             registerReceiver(screenReceiver, f)
             startScan()
             handler.postDelayed(tick, TICK_MS)
+            handler.post(weatherTick)
         }
         return START_STICKY
     }

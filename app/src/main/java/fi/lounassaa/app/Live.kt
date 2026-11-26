@@ -17,6 +17,9 @@ object Prefs {
     fun indoor(c: Context): String? = sp(c).getString("indoor", null)
     fun setOutdoor(c: Context, mac: String?) = sp(c).edit().putString("outdoor", mac).apply()
     fun setIndoor(c: Context, mac: String?) = sp(c).edit().putString("indoor", mac).apply()
+    /** Äkäslompolo, village centre. Changeable later in settings. */
+    fun lat(c: Context): Double = sp(c).getFloat("lat", 67.6020f).toDouble()
+    fun lon(c: Context): Double = sp(c).getFloat("lon", 24.1530f).toDouble()
     fun nightStart(c: Context): Int = sp(c).getInt("nightStart", 23 * 60)
     fun nightEnd(c: Context): Int = sp(c).getInt("nightEnd", 6 * 60 + 30)
     fun setNightStart(c: Context, m: Int) = sp(c).edit().putInt("nightStart", m).apply()

@@ -20,7 +20,7 @@ data class StoredReading(
 )
 
 class Db private constructor(ctx: Context) :
-    SQLiteOpenHelper(ctx.applicationContext, "lounassaa.db", null, 1) {
+    SQLiteOpenHelper(ctx.applicationContext, "lounassaa.db", null, 2) {
 
     companion object {
         @Volatile private var inst: Db? = null
@@ -36,9 +36,82 @@ class Db private constructor(ctx: Context) :
                 "volt REAL, rssi INTEGER, seq INTEGER, PRIMARY KEY(ts, mac))"
         )
         db.execSQL("CREATE TABLE events(ts INTEGER NOT NULL, kind TEXT NOT NULL, info TEXT)")
+        createForecast(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+    private fun createForecast(db: SQLiteDatabase) {
+        // One row per forecast hour per fetch, kept permanently (yesterday's forecast, accuracy comparison).
+        db.execSQL(
+            "CREATE TABLE forecast(fetched INTEGER NOT NULL, ts INTEGER NOT NULL, temp REAL, " +
+                "precip REAL, symbol TEXT, PRIMARY KEY(fetched, ts))"
+        )
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) createForecast(db)
+    }
+
+    @Synchronized
+    fun insertForecast(fetched: Long, points: List<FcPoint>) {
+        val w = writableDatabase
+        w.beginTransaction()
+        try {
+            for (p in points) {
+                val v = ContentValues().apply {
+                    put("fetched", fetched)
+                    put("ts", p.ts)
+                    put("temp", p.temp)
+                    if (!p.precip.isNaN()) put("precip", p.precip)
+                    put("symbol", p.symbol)
+                }
+                w.insertWithOnConflict("forecast", null, v, SQLiteDatabase.CONFLICT_REPLACE)
+            }
+            w.setTransactionSuccessful()
+        } finally {
+            w.endTransaction()
+        }
+    }
+
+    @Synchronized
+    fun latestForecastFetch(): Long = readableDatabase.rawQuery("SELECT MAX(fetched) FROM forecast", null).use {
+        if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+    }
+
+    /** The fetch closest to [ts], if one exists within [tolerance] ms. */
+    @Synchronized
+    fun forecastFetchNear(ts: Long, tolerance: Long): Long = readableDatabase.rawQuery(
+        "SELECT fetched FROM forecast WHERE fetched BETWEEN ? AND ? GROUP BY fetched ORDER BY ABS(fetched - ?) LIMIT 1",
+        arrayOf((ts - tolerance).toString(), (ts + tolerance).toString(), ts.toString())
+    ).use { if (it.moveToFirst()) it.getLong(0) else 0L }
+
+    @Synchronized
+    fun forecast(fetched: Long, from: Long, to: Long): List<FcPoint> {
+        val out = ArrayList<FcPoint>()
+        readableDatabase.rawQuery(
+            "SELECT ts, temp, precip, symbol FROM forecast WHERE fetched = ? AND ts BETWEEN ? AND ? ORDER BY ts",
+            arrayOf(fetched.toString(), from.toString(), to.toString())
+        ).use { c ->
+            while (c.moveToNext()) {
+                out.add(
+                    FcPoint(
+                        c.getLong(0), c.getDouble(1),
+                        if (c.isNull(2)) Double.NaN else c.getDouble(2), c.getString(3) ?: ""
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    @Synchronized
+    fun temps(mac: String, from: Long, to: Long): List<Pair<Long, Double>> {
+        val out = ArrayList<Pair<Long, Double>>()
+        readableDatabase.rawQuery(
+            "SELECT ts, temp FROM readings WHERE mac = ? AND ts BETWEEN ? AND ? ORDER BY ts",
+            arrayOf(mac, from.toString(), to.toString())
+        ).use { c -> while (c.moveToNext()) out.add(c.getLong(0) to c.getDouble(1)) }
+        return out
+    }
 
     @Synchronized
     fun insertReading(ts: Long, mac: String, r: RuuviReading, rssi: Int) {
