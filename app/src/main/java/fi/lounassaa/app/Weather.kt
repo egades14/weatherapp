@@ -14,6 +14,8 @@ import java.util.concurrent.Executors
 /** One forecast hour: temperature at [ts], precipitation (mm) for the hour starting at [ts]. */
 data class FcPoint(val ts: Long, val temp: Double, val precip: Double, val symbol: String)
 
+enum class PrecipKind { RAIN, SLEET, SNOW }
+
 data class NowcastPoint(val ts: Long, val rate: Double)
 
 data class Nowcast(val fetched: Long, val radarOk: Boolean, val points: List<NowcastPoint>)
@@ -73,11 +75,26 @@ object Weather {
         return Nowcast(fetched, coverage == "ok", pts)
     }
 
-    fun kindOf(symbol: String): String = when {
-        symbol.contains("sleet") -> "Räntäsadetta"
-        symbol.contains("snow") -> "Lumisadetta"
-        else -> "Sadetta"
+    /** Type from Yr's symbol code; if the symbol has no precipitation type (very light amounts), from temperature. */
+    fun kindFor(symbol: String, temp: Double): PrecipKind = when {
+        symbol.contains("sleet") -> PrecipKind.SLEET
+        symbol.contains("snow") -> PrecipKind.SNOW
+        symbol.contains("rain") || symbol.contains("drizzle") -> PrecipKind.RAIN
+        temp.isNaN() -> PrecipKind.RAIN
+        temp <= -1.0 -> PrecipKind.SNOW
+        temp <= 1.5 -> PrecipKind.SLEET
+        else -> PrecipKind.RAIN
     }
+
+    fun kindFor(p: FcPoint): PrecipKind = kindFor(p.symbol, p.temp)
+
+    fun kindText(k: PrecipKind): String = when (k) {
+        PrecipKind.SLEET -> "Räntäsadetta"
+        PrecipKind.SNOW -> "Lumisadetta"
+        PrecipKind.RAIN -> "Sadetta"
+    }
+
+    fun kindOf(symbol: String, temp: Double = Double.NaN): String = kindText(kindFor(symbol, temp))
 
     /**
      * Short precipitation line: radar nowcast for the next 2 h if available, otherwise the hourly
@@ -85,7 +102,8 @@ object Weather {
      */
     fun precipText(nc: Nowcast?, fc: List<FcPoint>, now: Long, threshold: Double = 0.1): String? {
         val hhmm = SimpleDateFormat("HH.mm", fi)
-        val kind = kindOf(fc.lastOrNull { it.ts <= now }?.symbol ?: fc.firstOrNull()?.symbol ?: "")
+        val cur = fc.lastOrNull { it.ts <= now } ?: fc.firstOrNull()
+        val kind = kindOf(cur?.symbol ?: "", cur?.temp ?: Double.NaN)
         if (nc != null && nc.radarOk && now - nc.fetched < 30 * 60 * 1000L) {
             val pts = nc.points.filter { it.ts >= now - 5 * 60 * 1000L }
             if (pts.isNotEmpty()) {
@@ -101,7 +119,7 @@ object Weather {
         }
         val next = fc.firstOrNull { it.ts + 3600_000L > now && it.ts < now + 6 * 3600_000L && it.precip >= threshold }
             ?: return null
-        val k = kindOf(next.symbol)
+        val k = kindText(kindFor(next))
         return if (next.ts <= now) "$k tällä tunnilla" else "$k noin klo ${SimpleDateFormat("HH", fi).format(Date(next.ts))} alkaen"
     }
 

@@ -70,3 +70,15 @@ class WeatherTest {
         assertFalse(Weather.kindOf("") == "Lumisadetta")
     }
 }
+
+class PrecipKindTest {
+    @org.junit.Test
+    fun fromSymbolThenTemperature() {
+        org.junit.Assert.assertEquals(PrecipKind.SNOW, Weather.kindFor("lightsnowshowers_night", 3.0))
+        org.junit.Assert.assertEquals(PrecipKind.SLEET, Weather.kindFor("sleet", -5.0))
+        org.junit.Assert.assertEquals(PrecipKind.RAIN, Weather.kindFor("lightrain", -0.5))
+        org.junit.Assert.assertEquals(PrecipKind.SNOW, Weather.kindFor("cloudy", -8.0))
+        org.junit.Assert.assertEquals(PrecipKind.SLEET, Weather.kindFor("cloudy", 0.5))
+        org.junit.Assert.assertEquals(PrecipKind.RAIN, Weather.kindFor("cloudy", 4.0))
+    }
+}

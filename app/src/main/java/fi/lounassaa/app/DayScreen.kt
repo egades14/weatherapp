@@ -411,18 +411,30 @@ class ChartView(ctx: Context, private val ui: Ui) : View(ctx) {
             cal.add(Calendar.HOUR_OF_DAY, 1)
         }
 
-        // Precipitation bars in the lowest 30 % of the plot
+        // Precipitation bars in the lowest 30 % of the plot, one type icon per run of same-type hours
         val bars = d.forecast.filter { it.ts + 3600_000L > d.now && it.ts < d.end && !it.precip.isNaN() && it.precip > 0.0 }
         if (bars.isNotEmpty()) {
             val scale = maxOf(2.0, bars.maxOf { it.precip })
             val band = (bottom - top) * 0.3f
             val gap = ui.pxF(2f)
+            fun barH(b: FcPoint) = (b.precip / scale).toFloat().coerceAtMost(1f) * band
             for (b in bars) {
                 val x0 = maxOf(x(maxOf(b.ts, d.now)), left) + gap
                 val x1 = minOf(x(b.ts + 3600_000L), right) - gap
                 if (x1 <= x0) continue
-                val hh = (b.precip / scale).toFloat().coerceAtMost(1f) * band
-                c.drawRect(x0, bottom - hh, x1, bottom, rain)
+                c.drawRect(x0, bottom - barH(b), x1, bottom, rain)
+            }
+            val size = ui.pxF(20f)
+            var i = 0
+            while (i < bars.size) {
+                val k = Weather.kindFor(bars[i])
+                var j = i
+                while (j + 1 < bars.size && bars[j + 1].ts - bars[j].ts == 3600_000L && Weather.kindFor(bars[j + 1]) == k) j++
+                val peak = bars.subList(i, j + 1).maxBy { it.precip }
+                val cx = ((x(maxOf(peak.ts, d.now)) + x(peak.ts + 3600_000L)) / 2).coerceIn(left + size, right - size)
+                val cy = bottom - barH(peak) - size * 0.75f
+                PrecipIcons.draw(c, k, cx, cy, size)
+                i = j + 1
             }
         }
 
@@ -444,5 +456,53 @@ class ChartView(ctx: Context, private val ui: Ui) : View(ctx) {
         val nx = x(d.now)
         c.drawLine(nx, top, nx, bottom, nowLine)
         c.drawText("nyt", nx + ui.pxF(6f), top + label.textSize, label)
+    }
+}
+
+/** Small vector icons for rain, sleet and snow, drawn centred at (cx, cy) within [size]. */
+object PrecipIcons {
+    private val water = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#5ec8e5")
+        style = Paint.Style.FILL
+    }
+    private val flake = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#e8eef3")
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    fun draw(c: Canvas, k: PrecipKind, cx: Float, cy: Float, size: Float) {
+        when (k) {
+            PrecipKind.RAIN -> drop(c, cx, cy, size)
+            PrecipKind.SNOW -> snow(c, cx, cy, size)
+            PrecipKind.SLEET -> {
+                drop(c, cx - size * 0.3f, cy + size * 0.1f, size * 0.65f)
+                snow(c, cx + size * 0.32f, cy - size * 0.1f, size * 0.65f)
+            }
+        }
+    }
+
+    private fun drop(c: Canvas, cx: Float, cy: Float, s: Float) {
+        val r = s * 0.3f
+        val by = cy + s * 0.18f
+        val p = Path().apply {
+            moveTo(cx, cy - s * 0.5f)
+            cubicTo(cx + r * 0.4f, cy - s * 0.2f, cx + r, by - r * 0.4f, cx + r, by)
+            arcTo(cx - r, by - r, cx + r, by + r, 0f, 180f, false)
+            cubicTo(cx - r, by - r * 0.4f, cx - r * 0.4f, cy - s * 0.2f, cx, cy - s * 0.5f)
+            close()
+        }
+        c.drawPath(p, water)
+    }
+
+    private fun snow(c: Canvas, cx: Float, cy: Float, s: Float) {
+        flake.strokeWidth = s * 0.1f
+        val r = s * 0.45f
+        for (a in 0 until 3) {
+            val ang = Math.toRadians(90.0 + a * 60.0)
+            val dx = (kotlin.math.cos(ang) * r).toFloat()
+            val dy = (kotlin.math.sin(ang) * r).toFloat()
+            c.drawLine(cx - dx, cy - dy, cx + dx, cy + dy, flake)
+        }
     }
 }
