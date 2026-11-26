@@ -52,7 +52,7 @@ class WeatherTest {
         val fc = Weather.parseForecast(forecastJson, t0)
         val nc = Weather.parseNowcast(nowcastJson, t0)
         val text = Weather.precipText(nc, fc, t0)!!
-        assertTrue(text, text.startsWith("Sadetta klo") && text.endsWith("alkaen"))
+        assertTrue(text, text.startsWith("Lumisadetta klo") && text.endsWith("alkaen"))
 
         val noRadar = nc.copy(radarOk = false)
         val fromFc = Weather.precipText(noRadar, fc, t0)!!
